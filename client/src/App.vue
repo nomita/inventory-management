@@ -29,6 +29,68 @@
             Restocking
           </router-link>
         </nav>
+
+        <!-- Global Search Bar -->
+        <div class="global-search" ref="searchContainer">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search inventory, orders..."
+            class="global-search-input"
+            @focus="searchFocused = true"
+            @input="onSearchInput"
+          />
+          <div v-if="showDropdown && searchResults.length > 0" class="search-dropdown">
+            <div v-if="inventoryResults.length > 0" class="search-section">
+              <div class="search-section-label">Inventory</div>
+              <div
+                v-for="item in inventoryResults"
+                :key="item.sku"
+                class="search-result-item"
+                @mousedown.prevent="goToInventory(item)"
+              >
+                <span class="result-name">{{ item.name }}</span>
+                <span class="result-meta">{{ item.sku }}</span>
+              </div>
+            </div>
+            <div v-if="orderResults.length > 0" class="search-section">
+              <div class="search-section-label">Orders</div>
+              <div
+                v-for="order in orderResults"
+                :key="order.id"
+                class="search-result-item"
+                @mousedown.prevent="goToOrders(order)"
+              >
+                <span class="result-name">{{ order.order_number }}</span>
+                <span class="result-meta">{{ order.customer }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="showDropdown && searchQuery.trim().length >= 2 && searchResults.length === 0" class="search-dropdown search-no-results">
+            No results found
+          </div>
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button class="dark-mode-toggle" @click="toggleDarkMode" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+          <!-- Sun icon (shown in dark mode to switch to light) -->
+          <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <!-- Moon icon (shown in light mode to switch to dark) -->
+          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+
         <LanguageSwitcher />
         <ProfileMenu
           @show-profile-details="showProfileDetails = true"
@@ -38,6 +100,8 @@
     </header>
     <FilterBar />
     <main class="main-content">
+      <!-- Low Stock Alert Banner -->
+      <LowStockAlert :inventory-items="inventoryItems" />
       <router-view />
     </main>
 
@@ -58,7 +122,8 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from './api'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
@@ -67,6 +132,7 @@ import ProfileMenu from './components/ProfileMenu.vue'
 import ProfileDetailsModal from './components/ProfileDetailsModal.vue'
 import TasksModal from './components/TasksModal.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import LowStockAlert from './components/LowStockAlert.vue'
 
 export default {
   name: 'App',
@@ -75,16 +141,89 @@ export default {
     ProfileMenu,
     ProfileDetailsModal,
     TasksModal,
-    LanguageSwitcher
+    LanguageSwitcher,
+    LowStockAlert
   },
   setup() {
     const { currentUser } = useAuth()
     const { t } = useI18n()
+    const router = useRouter()
     const showProfileDetails = ref(false)
     const showTasks = ref(false)
     const apiTasks = ref([])
 
-    // Merge mock tasks from currentUser with API tasks
+    // ------- Dark Mode -------
+    const isDark = ref(false)
+
+    const applyDarkMode = (dark) => {
+      if (dark) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+
+    const toggleDarkMode = () => {
+      isDark.value = !isDark.value
+      localStorage.setItem('darkMode', isDark.value ? '1' : '0')
+      applyDarkMode(isDark.value)
+    }
+
+    // ------- Global Search -------
+    const searchQuery = ref('')
+    const searchFocused = ref(false)
+    const inventoryItems = ref([])
+    const allOrders = ref([])
+    const searchContainer = ref(null)
+
+    const showDropdown = computed(() => {
+      return searchFocused.value && searchQuery.value.trim().length >= 2
+    })
+
+    const inventoryResults = computed(() => {
+      if (searchQuery.value.trim().length < 2) return []
+      const q = searchQuery.value.toLowerCase().trim()
+      return inventoryItems.value.filter(item =>
+        item.name.toLowerCase().includes(q) ||
+        (item.sku && item.sku.toLowerCase().includes(q))
+      ).slice(0, 4)
+    })
+
+    const orderResults = computed(() => {
+      if (searchQuery.value.trim().length < 2) return []
+      const q = searchQuery.value.toLowerCase().trim()
+      return allOrders.value.filter(order =>
+        (order.order_number && order.order_number.toLowerCase().includes(q)) ||
+        (order.customer && order.customer.toLowerCase().includes(q))
+      ).slice(0, 4)
+    })
+
+    const searchResults = computed(() => [...inventoryResults.value, ...orderResults.value])
+
+    const onSearchInput = () => {
+      searchFocused.value = true
+    }
+
+    const goToInventory = () => {
+      searchQuery.value = ''
+      searchFocused.value = false
+      router.push('/inventory')
+    }
+
+    const goToOrders = () => {
+      searchQuery.value = ''
+      searchFocused.value = false
+      router.push('/orders')
+    }
+
+    // Close dropdown when clicking outside
+    const handleOutsideClick = (event) => {
+      if (searchContainer.value && !searchContainer.value.contains(event.target)) {
+        searchFocused.value = false
+      }
+    }
+
+    // ------- Tasks -------
     const tasks = computed(() => {
       return [...currentUser.value.tasks, ...apiTasks.value]
     })
@@ -149,7 +288,38 @@ export default {
       }
     }
 
-    onMounted(loadTasks)
+    // ------- Load global data for search + low stock alerts -------
+    const loadGlobalData = async () => {
+      try {
+        const [inv, orders] = await Promise.all([
+          api.getInventory(),
+          api.getOrders()
+        ])
+        inventoryItems.value = inv
+        allOrders.value = orders
+      } catch (err) {
+        console.error('Failed to load global data:', err)
+      }
+    }
+
+    onMounted(() => {
+      // Restore dark mode preference
+      const saved = localStorage.getItem('darkMode')
+      if (saved === '1') {
+        isDark.value = true
+        applyDarkMode(true)
+      }
+
+      loadTasks()
+      loadGlobalData()
+
+      // Listen for outside clicks to close search dropdown
+      document.addEventListener('click', handleOutsideClick)
+    })
+
+    onUnmounted(() => {
+      document.removeEventListener('click', handleOutsideClick)
+    })
 
     return {
       t,
@@ -158,7 +328,23 @@ export default {
       tasks,
       addTask,
       deleteTask,
-      toggleTask
+      toggleTask,
+      // dark mode
+      isDark,
+      toggleDarkMode,
+      // search
+      searchQuery,
+      searchFocused,
+      showDropdown,
+      inventoryResults,
+      orderResults,
+      searchResults,
+      onSearchInput,
+      goToInventory,
+      goToOrders,
+      searchContainer,
+      // low stock
+      inventoryItems
     }
   }
 }
@@ -485,5 +671,264 @@ tbody tr:hover {
   border-radius: 8px;
   margin: 1rem 0;
   font-size: 0.938rem;
+}
+
+/* =====================
+   Dark Mode Toggle Button
+   ===================== */
+.dark-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+
+.dark-mode-toggle:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.dark-mode-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* =====================
+   Global Search
+   ===================== */
+.global-search {
+  position: relative;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.global-search-input {
+  width: 220px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.global-search-input:focus {
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.global-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 300px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.search-no-results {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.search-section {
+  padding: 0.5rem 0;
+}
+
+.search-section + .search-section {
+  border-top: 1px solid #f1f5f9;
+}
+
+.search-section-label {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.search-result-item:hover {
+  background: #f1f5f9;
+}
+
+.result-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+/* =====================
+   Dark Mode Overrides
+   ===================== */
+html.dark body {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+html.dark .top-nav {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark .card,
+html.dark .stat-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark table thead {
+  background: #1e293b;
+}
+
+html.dark td,
+html.dark th {
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+html.dark .nav-tabs a {
+  color: #94a3b8;
+}
+
+html.dark .nav-tabs a:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+html.dark .nav-tabs a.active {
+  background: #1e3a5f;
+  color: #60a5fa;
+}
+
+html.dark .logo h1 {
+  color: #f1f5f9;
+}
+
+html.dark .subtitle {
+  color: #94a3b8;
+}
+
+html.dark .main-content {
+  background: transparent;
+}
+
+html.dark input,
+html.dark select {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html.dark tbody tr:hover {
+  background: #1e293b;
+}
+
+html.dark .badge.success {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+html.dark .badge.warning {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+html.dark .badge.danger {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+html.dark .badge.info {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+html.dark .dark-mode-toggle {
+  color: #94a3b8;
+}
+
+html.dark .dark-mode-toggle:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+html.dark .global-search-input {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html.dark .global-search-input::placeholder {
+  color: #64748b;
+}
+
+html.dark .search-dropdown {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark .search-result-item:hover {
+  background: #334155;
+}
+
+html.dark .result-name {
+  color: #e2e8f0;
+}
+
+html.dark .card-header {
+  border-color: #334155;
+}
+
+html.dark .card-title {
+  color: #e2e8f0;
+}
+
+html.dark .stat-value {
+  color: #e2e8f0;
+}
+
+html.dark .page-header h2 {
+  color: #e2e8f0;
 }
 </style>

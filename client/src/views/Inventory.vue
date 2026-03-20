@@ -11,6 +11,13 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">{{ t('inventory.stockLevels') }} ({{ filteredItems.length }} {{ t('inventory.skus') }})</h3>
+          <div class="header-actions">
+          <button class="export-btn" @click="handleExport" title="Export to CSV">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+              <path d="M3 17h14M10 3v10M6 9l4 4 4-4"/>
+            </svg>
+            Export CSV
+          </button>
           <div class="search-box">
             <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
@@ -31,6 +38,7 @@
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
               </svg>
             </button>
+          </div>
           </div>
         </div>
         <div class="table-container">
@@ -88,6 +96,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useExportCsv } from '../composables/useExportCsv'
 import InventoryDetailModal from '../components/InventoryDetailModal.vue'
 
 export default {
@@ -113,6 +122,7 @@ export default {
 
     // Use shared filters
     const { selectedLocation, selectedCategory, getCurrentFilters } = useFilters()
+    const { exportToCsv } = useExportCsv()
 
     // Stock status order for sorting (using status keys)
     const STATUS_ORDER = { 'lowStock': 0, 'adequate': 1, 'inStock': 2 }
@@ -201,6 +211,30 @@ export default {
       showItemModal.value = true
     }
 
+    const handleExport = () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const columns = [
+        { key: 'sku', label: 'SKU' },
+        { key: 'name', label: 'Item Name' },
+        { key: 'category', label: 'Category' },
+        { key: 'location', label: 'Warehouse' },
+        { key: 'quantity_on_hand', label: 'Quantity on Hand' },
+        { key: 'reorder_point', label: 'Reorder Point' },
+        { key: 'unit_cost', label: 'Unit Cost' },
+        // total_value is derived — compute it inline for each row
+        { key: '_total_value', label: 'Total Value' },
+        { key: 'bin_location', label: 'Location' },
+        { key: '_status', label: 'Status' }
+      ]
+      // Map filteredItems to include derived fields
+      const rows = filteredItems.value.map(item => ({
+        ...item,
+        _total_value: (item.quantity_on_hand * item.unit_cost).toFixed(2),
+        _status: getStockStatusKey(item)
+      }))
+      exportToCsv(`inventory-${today}.csv`, rows, columns)
+    }
+
     onMounted(loadInventory)
 
     return {
@@ -218,7 +252,9 @@ export default {
       showItemDetail,
       currencySymbol,
       translateProductName,
-      translateWarehouse
+      translateWarehouse,
+      handleExport,
+      getStockStatusKey
     }
   }
 }
@@ -245,6 +281,34 @@ export default {
   gap: 1.5rem;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.export-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .card-title {

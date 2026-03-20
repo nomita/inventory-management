@@ -70,6 +70,12 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">{{ t('orders.allOrders') }} ({{ orders.length }})</h3>
+          <button class="export-btn" @click="handleExport" title="Export to CSV">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+              <path d="M3 17h14M10 3v10M6 9l4 4 4-4"/>
+            </svg>
+            Export CSV
+          </button>
         </div>
         <div class="table-container">
           <table class="orders-table">
@@ -123,11 +129,13 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useExportCsv } from '../composables/useExportCsv'
 
 export default {
   name: 'Orders',
   setup() {
     const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
+    const { exportToCsv } = useExportCsv()
 
     const currencySymbol = computed(() => {
       return currentCurrency.value === 'JPY' ? '¥' : '$'
@@ -212,6 +220,20 @@ export default {
       return `${leadDays} days (${formatted})`
     }
 
+    const handleExport = () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const columns = [
+        { key: 'order_number', label: 'Order Number' },
+        { key: 'customer', label: 'Customer' },
+        { key: 'status', label: 'Status' },
+        { key: 'order_date', label: 'Order Date' },
+        { key: 'expected_delivery', label: 'Expected Delivery' },
+        { key: 'total_value', label: 'Total Value' },
+        { key: 'warehouse', label: 'Warehouse' }
+      ]
+      exportToCsv(`orders-${today}.csv`, orders.value, columns)
+    }
+
     onMounted(() => {
       loadOrders()
       loadRestockingOrders()
@@ -229,7 +251,8 @@ export default {
       translateProductName,
       translateCustomerName,
       restockingOrders,
-      formatRestockDelivery
+      formatRestockDelivery,
+      handleExport
     }
   }
 }
@@ -344,5 +367,27 @@ export default {
 .restocking-section {
   margin-bottom: 1.5rem;
   border-left: 3px solid #3b82f6;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.export-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 </style>
