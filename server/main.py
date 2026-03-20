@@ -201,6 +201,36 @@ def get_backlog():
         result.append(item_dict)
     return result
 
+@app.post("/api/purchase-orders", response_model=PurchaseOrder)
+def create_purchase_order(request: CreatePurchaseOrderRequest):
+    """Create a new purchase order for a backlog item"""
+    # Verify the backlog item exists
+    backlog_item = next((b for b in backlog_items if b["id"] == request.backlog_item_id), None)
+    if not backlog_item:
+        raise HTTPException(status_code=404, detail=f"Backlog item {request.backlog_item_id} not found")
+
+    po = {
+        "id": f"PO-{str(uuid.uuid4())[:8].upper()}",
+        "backlog_item_id": request.backlog_item_id,
+        "supplier_name": request.supplier_name,
+        "quantity": request.quantity,
+        "unit_cost": request.unit_cost,
+        "expected_delivery_date": request.expected_delivery_date,
+        "status": "Pending",
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
+        "notes": request.notes
+    }
+    purchase_orders.append(po)
+    return po
+
+@app.get("/api/purchase-orders/{backlog_item_id}", response_model=PurchaseOrder)
+def get_purchase_order_by_backlog_item(backlog_item_id: str):
+    """Get the purchase order for a specific backlog item"""
+    po = next((p for p in purchase_orders if p["backlog_item_id"] == backlog_item_id), None)
+    if not po:
+        raise HTTPException(status_code=404, detail=f"No purchase order found for backlog item {backlog_item_id}")
+    return po
+
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary(
     warehouse: Optional[str] = None,
@@ -250,14 +280,25 @@ def get_recent_transactions():
     return recent_transactions
 
 @app.get("/api/reports/quarterly")
-def get_quarterly_reports():
-    """Get quarterly performance reports"""
-    # Calculate quarterly statistics from orders
-    quarters = {}
+def get_quarterly_reports(
+    warehouse: Optional[str] = None,
+    category: Optional[str] = None,
+    month: Optional[str] = None
+):
+    """Get quarterly performance reports with optional filtering"""
+    filtered = orders
 
-    for order in orders:
+    if warehouse and warehouse != 'all':
+        filtered = [o for o in filtered if o.get('warehouse') == warehouse]
+    if category and category != 'all':
+        filtered = [o for o in filtered if o.get('category', '').lower() == category.lower()]
+    # When a specific month filter is active, restrict to that quarter
+    if month and month != 'all':
+        filtered = [o for o in filtered if o.get('order_date', '').startswith(month)]
+
+    quarters = {}
+    for order in filtered:
         order_date = order.get('order_date', '')
-        # Determine quarter
         if '2025-01' in order_date or '2025-02' in order_date or '2025-03' in order_date:
             quarter = 'Q1-2025'
         elif '2025-04' in order_date or '2025-05' in order_date or '2025-06' in order_date:
@@ -283,7 +324,6 @@ def get_quarterly_reports():
         if order.get('status') == 'Delivered':
             quarters[quarter]['delivered_orders'] += 1
 
-    # Calculate averages and fulfillment rate
     result = []
     for q, data in quarters.items():
         if data['total_orders'] > 0:
@@ -291,37 +331,47 @@ def get_quarterly_reports():
             data['fulfillment_rate'] = round((data['delivered_orders'] / data['total_orders']) * 100, 1)
         result.append(data)
 
-    # Sort by quarter
     result.sort(key=lambda x: x['quarter'])
     return result
 
 @app.get("/api/reports/monthly-trends")
-def get_monthly_trends():
-    """Get month-over-month trends"""
-    months = {}
+def get_monthly_trends(
+    warehouse: Optional[str] = None,
+    category: Optional[str] = None,
+    month: Optional[str] = None
+):
+    """Get month-over-month trends with optional filtering"""
+    filtered = orders
 
-    for order in orders:
+    if warehouse and warehouse != 'all':
+        filtered = [o for o in filtered if o.get('warehouse') == warehouse]
+    if category and category != 'all':
+        filtered = [o for o in filtered if o.get('category', '').lower() == category.lower()]
+    if month and month != 'all':
+        filtered = [o for o in filtered if o.get('order_date', '').startswith(month)]
+
+    months = {}
+    for order in filtered:
         order_date = order.get('order_date', '')
         if not order_date:
             continue
 
-        # Extract month (format: YYYY-MM-DD)
-        month = order_date[:7]  # Gets YYYY-MM
+        # Extract YYYY-MM from order date
+        order_month = order_date[:7]
 
-        if month not in months:
-            months[month] = {
-                'month': month,
+        if order_month not in months:
+            months[order_month] = {
+                'month': order_month,
                 'order_count': 0,
                 'revenue': 0,
                 'delivered_count': 0
             }
 
-        months[month]['order_count'] += 1
-        months[month]['revenue'] += order.get('total_value', 0)
+        months[order_month]['order_count'] += 1
+        months[order_month]['revenue'] += order.get('total_value', 0)
         if order.get('status') == 'Delivered':
-            months[month]['delivered_count'] += 1
+            months[order_month]['delivered_count'] += 1
 
-    # Convert to list and sort
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result

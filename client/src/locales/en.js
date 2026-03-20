@@ -311,6 +311,63 @@ export default {
     selectLanguage: 'Select Language'
   },
 
+  // Reports
+  reports: {
+    title: 'Performance Reports',
+    description: 'View quarterly performance metrics and monthly trends',
+    quarterly: {
+      title: 'Quarterly Performance',
+      quarter: 'Quarter',
+      totalOrders: 'Total Orders',
+      totalRevenue: 'Total Revenue',
+      avgOrderValue: 'Avg Order Value',
+      fulfillmentRate: 'Fulfillment Rate'
+    },
+    monthlyTrend: {
+      title: 'Monthly Revenue Trend'
+    },
+    monthOverMonth: {
+      title: 'Month-over-Month Analysis',
+      month: 'Month',
+      orders: 'Orders',
+      revenue: 'Revenue',
+      change: 'Change',
+      growthRate: 'Growth Rate'
+    },
+    summary: {
+      totalRevenue: 'Total Revenue (YTD)',
+      avgMonthlyRevenue: 'Avg Monthly Revenue',
+      totalOrders: 'Total Orders (YTD)',
+      bestQuarter: 'Best Performing Quarter'
+    }
+  },
+
+  // Purchase Orders
+  purchaseOrder: {
+    createTitle: 'Create Purchase Order',
+    viewTitle: 'Purchase Order Details',
+    quantityNeeded: 'Quantity Needed',
+    priority: 'Priority',
+    supplierName: 'Supplier Name',
+    supplierNamePlaceholder: 'Enter supplier name',
+    supplierRequired: 'Supplier name is required',
+    quantity: 'Quantity',
+    quantityRequired: 'Quantity must be at least 1',
+    unitCost: 'Unit Cost',
+    unitCostPlaceholder: '0.00',
+    estimatedTotal: 'Estimated Total',
+    expectedDelivery: 'Expected Delivery Date',
+    notes: 'Notes',
+    notesPlaceholder: 'Optional notes...',
+    status: 'Status',
+    createdDate: 'Created Date',
+    createPo: 'Create PO',
+    creating: 'Creating...',
+    createError: 'Failed to create purchase order. Please try again.',
+    fetchError: 'Failed to load purchase order details.',
+    noPoFound: 'No purchase order found for this item.'
+  },
+
   // Common
   common: {
     loading: 'Loading...',

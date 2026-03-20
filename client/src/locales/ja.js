@@ -311,6 +311,63 @@ export default {
     selectLanguage: '言語を選択'
   },
 
+  // Reports
+  reports: {
+    title: 'パフォーマンスレポート',
+    description: '四半期パフォーマンス指標と月次トレンドを表示',
+    quarterly: {
+      title: '四半期パフォーマンス',
+      quarter: '四半期',
+      totalOrders: '総注文数',
+      totalRevenue: '総収益',
+      avgOrderValue: '平均注文額',
+      fulfillmentRate: '履行率'
+    },
+    monthlyTrend: {
+      title: '月次収益トレンド'
+    },
+    monthOverMonth: {
+      title: '前月比分析',
+      month: '月',
+      orders: '注文数',
+      revenue: '収益',
+      change: '変化',
+      growthRate: '成長率'
+    },
+    summary: {
+      totalRevenue: '総収益（年初来）',
+      avgMonthlyRevenue: '平均月次収益',
+      totalOrders: '総注文数（年初来）',
+      bestQuarter: '最高パフォーマンス四半期'
+    }
+  },
+
+  // Purchase Orders
+  purchaseOrder: {
+    createTitle: '発注書の作成',
+    viewTitle: '発注書の詳細',
+    quantityNeeded: '必要数量',
+    priority: '優先度',
+    supplierName: 'サプライヤー名',
+    supplierNamePlaceholder: 'サプライヤー名を入力',
+    supplierRequired: 'サプライヤー名は必須です',
+    quantity: '数量',
+    quantityRequired: '数量は1以上である必要があります',
+    unitCost: '単価',
+    unitCostPlaceholder: '0.00',
+    estimatedTotal: '見積合計',
+    expectedDelivery: '予定納期',
+    notes: '備考',
+    notesPlaceholder: '任意の備考...',
+    status: 'ステータス',
+    createdDate: '作成日',
+    createPo: '発注書を作成',
+    creating: '作成中...',
+    createError: '発注書の作成に失敗しました。再試行してください。',
+    fetchError: '発注書の詳細を読み込めませんでした。',
+    noPoFound: 'この品目の発注書が見つかりません。'
+  },
+
   // Common
   common: {
     loading: '読み込み中...',
