@@ -1,8 +1,11 @@
+import uuid
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
-from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders, restocking_orders
+import mock_data
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -119,6 +122,25 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
+
+class RestockingOrderItem(BaseModel):
+    sku: str
+    name: str
+    quantity: int
+    unit_cost: float
+
+class RestockingOrder(BaseModel):
+    id: str
+    order_number: str
+    items: List[RestockingOrderItem]
+    status: str
+    submitted_date: str
+    expected_delivery: str
+    total_value: float
+    lead_time_days: int
+
+class CreateRestockingOrderRequest(BaseModel):
+    items: List[RestockingOrderItem]
 
 # API endpoints
 @app.get("/")
@@ -303,6 +325,36 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/restocking-orders", response_model=List[RestockingOrder])
+def get_restocking_orders():
+    """Get all submitted restocking orders"""
+    return mock_data.restocking_orders
+
+@app.post("/api/restocking-orders", response_model=RestockingOrder, status_code=201)
+def create_restocking_order(request: CreateRestockingOrderRequest):
+    """Submit a new restocking order built from demand forecast recommendations"""
+    if not request.items:
+        raise HTTPException(status_code=400, detail="At least one item is required")
+
+    now = datetime.utcnow()
+    expected = now + timedelta(days=14)
+    # Order number uses a counter based on how many restocking orders exist
+    order_number = f"RST-{len(mock_data.restocking_orders) + 1:04d}"
+    total_value = sum(item.quantity * item.unit_cost for item in request.items)
+
+    new_order = {
+        "id": str(uuid.uuid4()),
+        "order_number": order_number,
+        "items": [item.dict() for item in request.items],
+        "status": "Processing",
+        "submitted_date": now.isoformat(),
+        "expected_delivery": expected.isoformat(),
+        "total_value": round(total_value, 2),
+        "lead_time_days": 14
+    }
+    mock_data.restocking_orders.append(new_order)
+    return new_order
 
 if __name__ == "__main__":
     import uvicorn
